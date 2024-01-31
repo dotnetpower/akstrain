@@ -690,12 +690,126 @@ echo "http://$GATEWAY_URL_EXTERNAL/productpage"
 curl -s "http://${GATEWAY_URL_EXTERNAL}/productpage" | grep -o "<title>.*</title>"
 
 ```
+> `<title>Simple Bookstore App</title>`
+
+확인된 URL 로 접속 시 - http://$GATEWAY_URL_EXTERNAL/productpage
+![Alt text](./images/image-bookinfo.png)
+
+## 모니터 도구
+
+Prometheus, Grafana, Jaeger, Kiali 설치
+```bash
+# Prometheus - metrics
+curl -s https://raw.githubusercontent.com/istio/istio/release-1.17/samples/addons/prometheus.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
+
+# Grafana - monitoring and metrics dashboards
+curl -s https://raw.githubusercontent.com/istio/istio/release-1.17/samples/addons/grafana.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
+
+# Jaeger - distributed tracing
+curl -s https://raw.githubusercontent.com/istio/istio/release-1.17/samples/addons/jaeger.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
+
+# Kiali installation
+helm install \
+    --version=1.63.1 \
+    --set cr.create=true \
+    --set cr.namespace=aks-istio-system \
+    --namespace aks-istio-system \
+    --create-namespace \
+    kiali-operator \
+    kiali/kiali-operator
+
+
+```
+
+Kiali 토큰 생성 및 포워포워딩(다른 콘솔에서, vscode 에서는 bash shell 추가하여 실행 필요)
+```bash
+# Kiali 에 접속하기 위한 토큰 생성
+kubectl -n aks-istio-system create token kiali-service-account
+
+# http://localhost:20001 으로 접속 할수 있도록 포트포워딩
+kubectl port-forward svc/kiali 20001:20001 -n aks-istio-system
+```
+
+(optional) vscode remote 환경이라면 하단 Ports 탭에서 20001 포트 추가 후 http://localhost:20001 로 접속 가능
+![Alt text](./images/image-kiali.png)
+
+
+트래픽을 발생시켜 Kiali UI 에서 확인
+```bash
+for i in $(seq 1 100); do curl -o /dev/null -s -w "Request: ${i}, Response: %{http_code}\n" "http://$GATEWAY_URL_EXTERNAL/productpage"; done
+```
+Kiali 의 Graph 메뉴
+![Alt text](./images/image-kiali-graph.png)
+![Alt text](./images/image-kiali-graph2.png)
+
+
+## Prometheus 포트포워딩 및 접속 확인 (background 실행)
+```bash
+kubectl port-forward -n aks-istio-system svc/prometheus 9090:9090 &
+```
+![Alt text](./images/image-prometheus.png)
+
+몇가지 쿼리 - https://istio.io/latest/docs/tasks/observability/metrics/querying-metrics/
+* productpage 서비스에 요청 수
+  ```
+  istio_requests_total{destination_service="productpage.bookinfo.svc.cluster.local"}
+  ```
+* reviews 서비스의 v3에 요청 수
+  ```
+  istio_requests_total{destination_service="reviews.bookinfo.svc.cluster.local", destination_version="v3"}
+  ```
+* 마지막 5분동안 productpage 의 모든 인스턴스에 대한 요청
+  ```x
+  rate(istio_requests_total{destination_service=~"productpage.*", response_code="200"}[5m])
+  ```
+
+## Grafana 포트포워딩 및 접속 확인 (background 실행)
+```bash
+kubectl port-forward -n aks-istio-system svc/grafana 3000:3000 &
+```
+Dashboard -> Browse -> istio
+![Alt text](./images/image-grafana.png)
+
+## Jaeger UI 포트포워딩 및 접속 확인 (background 실행)
+```bash
+kubectl port-forward -n aks-istio-system $JAEGER_POD 16686:16686 &
+```
+![Alt text](./images/image-jaeger.png)
+
+DAG(Directed Acyclic Graph) 확인
+1. Search 메뉴
+2. Service 에 productpage.bookinfo 선택
+3. Lookback 에 적절한 시간 선택 후 Find Traces
+4. 결과 하나를 클릭
+5. System Architecture 메뉴
+6. DAG 클릭
+
+![Alt text](./images/image-jaeger-dag.png)
+
+
+# istio 실습
+## Request Routing
+> [!Note]
+> http://$GATEWAY_URL_EXTERNAL/productpage 에 접속하여 새로고침을 하여 reviews 의 버전이 바뀌는 것을 확인
+> 1. v1 적용 후 새로고침 해서 v1 으로 고정이 되는지 확인
+> 2. 사용자 계정은 jason/jason 이므로 로그인 후 v1 으로 유지 되는지 확인
+> 3. v2 적용 후 새로고침, 로그아웃 후 예상과 같이 동작 하는지 확인
+```bash
+# 모든 요청을 reviews:v1 으로만 보내기
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.17/samples/bookinfo/networking/virtual-service-all-v1.yaml -n bookinfo
+
+# jason 만 reviews:v2 로 보내기
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.17/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+```
+
 
 
 ---
 
 
 
+vscode remote ports
+![Alt text](./images/image-vscode-ports.png)
 
 ```
 # bash 커맨드 창에 시간 찍기
