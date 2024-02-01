@@ -61,7 +61,7 @@ aks and istio
 istio-env.sh
 ```
 # 환경변수
-seq=6
+seq=7
 export CLUSTER=istio-addon-lab-${seq}
 export RESOURCE_GROUP=istio-addon-lab-rg-${seq}
 export LOCATION=eastus #koreacentral
@@ -125,15 +125,16 @@ kubectl get pods -n aks-istio-system
 sidecar 주입 활성화(bookinfo)
 ```bash
 kubectl create ns bookinfo
-kubectl label namespace bookinfo istio.io/rev=asm-1-17
+kubectl label namespace bookinfo istio.io/rev=asm-1-18
 
 
 ```
 
 istioctl 설치
+**istio 버전이 바뀔 수 있으므로 확인 필요**
 ```bash
 # 버전 확인
-ISTIO_VERSION="$(kubectl get deploy istiod-asm-1-17 -n aks-istio-system -o yaml | grep image: | egrep -o '[0-9]+\.[0-9]+\.[0-9]+')"
+ISTIO_VERSION="$(kubectl get deploy istiod-asm-1-18 -n aks-istio-system -o yaml | grep image: | egrep -o '[0-9]+\.[0-9]+\.[0-9]+')"
 
 # 설정된 버전 확인
 echo $ISTIO_VERSION
@@ -147,8 +148,8 @@ rm -rf "./istio-${ISTIO_VERSION}/"
 istioctl -i aks-istio-system version
 
 ```
-> client version: 1.17.8 \
-control plane version: 1.17-dev \
+> client version: 1.18.7 \
+control plane version: 1.18-dev \
 data plane version: none
 
 **data plane 이 none 으로 보여지는 이유는 배포된 in/egress traffic, envoy proxy 가 없기 때문**
@@ -164,15 +165,16 @@ kubectl get svc aks-istio-ingressgateway-external -n aks-istio-ingress
 # istiod 버전 확인
 kubectl get deploy -n aks-istio-system
 
-# istiod dash 설치/실행(버전이 1.17인 경우)
-istioctl dashboard controlz deployment/istiod-asm-1-17 -n aks-istio-system
+# istiod dash 설치/실행(버전이 1.18인 경우)
+istioctl dashboard controlz deployment/istiod-asm-1-18 -n aks-istio-system
+
 ```
 
 ![Alt text](./images/image.png)
 
 Bookinfo 샘플 앱 배포
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.17/samples/bookinfo/platform/kube/bookinfo.yaml -n bookinfo
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/platform/kube/bookinfo.yaml -n bookinfo
 
 ```
 <details>
@@ -253,12 +255,10 @@ spec:
       serviceAccountName: bookinfo-details
       containers:
       - name: details
-        image: docker.io/istio/examples-bookinfo-details-v1:1.17.0
+        image: docker.io/istio/examples-bookinfo-details-v1:1.16.2
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
-        securityContext:
-          runAsUser: 1000
 ---
 ##################################################################################################
 # Ratings service
@@ -306,12 +306,10 @@ spec:
       serviceAccountName: bookinfo-ratings
       containers:
       - name: ratings
-        image: docker.io/istio/examples-bookinfo-ratings-v1:1.17.0
+        image: docker.io/istio/examples-bookinfo-ratings-v1:1.16.2
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
-        securityContext:
-          runAsUser: 1000
 ---
 ##################################################################################################
 # Reviews service
@@ -359,7 +357,7 @@ spec:
       serviceAccountName: bookinfo-reviews
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v1:1.17.0
+        image: docker.io/istio/examples-bookinfo-reviews-v1:1.16.2
         imagePullPolicy: IfNotPresent
         env:
         - name: LOG_DIR
@@ -371,8 +369,6 @@ spec:
           mountPath: /tmp
         - name: wlp-output
           mountPath: /opt/ibm/wlp/output
-        securityContext:
-          runAsUser: 1000
       volumes:
       - name: wlp-output
         emptyDir: {}
@@ -401,7 +397,7 @@ spec:
       serviceAccountName: bookinfo-reviews
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v2:1.17.0
+        image: docker.io/istio/examples-bookinfo-reviews-v2:1.16.2
         imagePullPolicy: IfNotPresent
         env:
         - name: LOG_DIR
@@ -413,8 +409,6 @@ spec:
           mountPath: /tmp
         - name: wlp-output
           mountPath: /opt/ibm/wlp/output
-        securityContext:
-          runAsUser: 1000
       volumes:
       - name: wlp-output
         emptyDir: {}
@@ -443,7 +437,7 @@ spec:
       serviceAccountName: bookinfo-reviews
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v3:1.17.0
+        image: docker.io/istio/examples-bookinfo-reviews-v3:1.16.2
         imagePullPolicy: IfNotPresent
         env:
         - name: LOG_DIR
@@ -455,8 +449,6 @@ spec:
           mountPath: /tmp
         - name: wlp-output
           mountPath: /opt/ibm/wlp/output
-        securityContext:
-          runAsUser: 1000
       volumes:
       - name: wlp-output
         emptyDir: {}
@@ -509,15 +501,13 @@ spec:
       serviceAccountName: bookinfo-productpage
       containers:
       - name: productpage
-        image: docker.io/istio/examples-bookinfo-productpage-v1:1.17.0
+        image: docker.io/istio/examples-bookinfo-productpage-v1:1.16.2
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
         volumeMounts:
         - name: tmp
           mountPath: /tmp
-        securityContext:
-          runAsUser: 1000
       volumes:
       - name: tmp
         emptyDir: {}
@@ -538,7 +528,7 @@ kubectl get pods -n bookinfo
 
 DestinationRule 설정
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.17/samples/bookinfo/networking/destination-rule-all.yaml -n bookinfo
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/destination-rule-all.yaml -n bookinfo
 
 # destinationrule 확인
 kubectl get destinationrules -n bookinfo
@@ -695,22 +685,35 @@ curl -s "http://${GATEWAY_URL_EXTERNAL}/productpage" | grep -o "<title>.*</title
 확인된 URL 로 접속 시 - http://$GATEWAY_URL_EXTERNAL/productpage
 ![Alt text](./images/image-bookinfo.png)
 
+전반적인 구조 확인 with ClusterInfo
+
+**구조만 확인**
+```bash
+# install clusterinfo with helm
+helm repo add scubakiz https://scubakiz.github.io/clusterinfo/
+helm repo update
+helm install clusterinfo scubakiz/clusterinfo
+
+# forward port to local
+kubectl port-forward svc/clusterinfo 5252:5252 -n clusterinfo
+```
+
 ## 모니터 도구
 
 Prometheus, Grafana, Jaeger, Kiali 설치
 ```bash
 # Prometheus - metrics
-curl -s https://raw.githubusercontent.com/istio/istio/release-1.17/samples/addons/prometheus.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
+curl -s https://raw.githubusercontent.com/istio/istio/release-1.18/samples/addons/prometheus.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
 
 # Grafana - monitoring and metrics dashboards
-curl -s https://raw.githubusercontent.com/istio/istio/release-1.17/samples/addons/grafana.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
+curl -s https://raw.githubusercontent.com/istio/istio/release-1.18/samples/addons/grafana.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
 
 # Jaeger - distributed tracing
-curl -s https://raw.githubusercontent.com/istio/istio/release-1.17/samples/addons/jaeger.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
+curl -s https://raw.githubusercontent.com/istio/istio/release-1.18/samples/addons/jaeger.yaml | sed 's/istio-system/aks-istio-system/g' | kubectl apply -f -
 
 # Kiali installation
 helm install \
-    --version=1.63.1 \
+    --version=1.76.0 \
     --set cr.create=true \
     --set cr.namespace=aks-istio-system \
     --namespace aks-istio-system \
@@ -721,13 +724,14 @@ helm install \
 
 ```
 
-Kiali 토큰 생성 및 포워포워딩(다른 콘솔에서, vscode 에서는 bash shell 추가하여 실행 필요)
+Kiali 토큰 생성 및 포워포워딩
 ```bash
-# Kiali 에 접속하기 위한 토큰 생성
+# Kiali 에 접속하기 위한 토큰 생성(kiali 생성 후 곧바로 실행 시 실패할 수 있으니 시간을 두고 실행)
 kubectl -n aks-istio-system create token kiali-service-account
 
+TODO: kiali 버전 재 확인 필요. https://github.com/istio/istio/blob/release-1.8/samples/addons/kiali.yaml 에서 추가 spec 정리 필요.
 # http://localhost:20001 으로 접속 할수 있도록 포트포워딩
-kubectl port-forward svc/kiali 20001:20001 -n aks-istio-system
+kubectl port-forward svc/kiali 20001:20001 -n aks-istio-system &
 ```
 
 (optional) vscode remote 환경이라면 하단 Ports 탭에서 20001 포트 추가 후 http://localhost:20001 로 접속 가능
@@ -786,6 +790,24 @@ DAG(Directed Acyclic Graph) 확인
 
 ![Alt text](./images/image-jaeger-dag.png)
 
+## 모니터링 w/ managed
+참고: [Prometheus 및 Grafana 사용](https://learn.microsoft.com/ko-kr/azure/azure-monitor/containers/kubernetes-monitoring-enable?tabs=cli#enable-prometheus-and-grafana)
+
+명령어 보다는 Azure Portal 에서 클릭하는게 편함.
+**추가 테스트 필요!!**
+```
+# 기본 Azure Monitor workspace 사용하도록 설정
+az aks update --enable-azure-monitor-metrics -n $CLUSTER -g $RESOURCE_GROUP
+
+### Use existing Azure Monitor workspace
+az aks create/update --enable-azure-monitor-metrics -n <cluster-name> -g <cluster-resource-group> --azure-monitor-workspace-resource-id <workspace-name-resource-id>
+
+### Use an existing Azure Monitor workspace and link with an existing Grafana workspace
+az aks create/update --enable-azure-monitor-metrics -n <cluster-name> -g <cluster-resource-group> --azure-monitor-workspace-resource-id <azure-monitor-workspace-name-resource-id> --grafana-resource-id  <grafana-workspace-name-resource-id>
+
+### Use optional parameters
+az aks create/update --enable-azure-monitor-metrics -n <cluster-name> -g <cluster-resource-group> --ksm-metric-labels-allow-list "namespaces=[k8s-label-1,k8s-label-n]" --ksm-metric-annotations-allow-list "pods=[k8s-annotation-1,k8s-annotation-n]"
+```
 
 # istio 실습
 ## Request Routing
@@ -794,14 +816,185 @@ DAG(Directed Acyclic Graph) 확인
 > 1. v1 적용 후 새로고침 해서 v1 으로 고정이 되는지 확인
 > 2. 사용자 계정은 jason/jason 이므로 로그인 후 v1 으로 유지 되는지 확인
 > 3. v2 적용 후 새로고침, 로그아웃 후 예상과 같이 동작 하는지 확인
+> (optional) Kaili 에서 요청이 v1 으로만 가는지 확인
 ```bash
 # 모든 요청을 reviews:v1 으로만 보내기
-kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.17/samples/bookinfo/networking/virtual-service-all-v1.yaml -n bookinfo
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-all-v1.yaml -n bookinfo
 
 # jason 만 reviews:v2 로 보내기
-kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.17/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+```
+<details>
+  <summary>virtual-service-all-v1.yaml</summary>
+  ```
+  apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: productpage
+  spec:
+    hosts:
+    - productpage
+    http:
+    - route:
+      - destination:
+          host: productpage
+          subset: v1
+  ---
+  apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: reviews
+  spec:
+    hosts:
+    - reviews
+    http:
+    - route:
+      - destination:
+          host: reviews
+          subset: v1
+  ---
+  apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: ratings
+  spec:
+    hosts:
+    - ratings
+    http:
+    - route:
+      - destination:
+          host: ratings
+          subset: v1
+  ---
+  apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: details
+  spec:
+    hosts:
+    - details
+    http:
+    - route:
+      - destination:
+          host: details
+          subset: v1
+  ---
+  ```
+</details>
+
+<details>
+  <summary>virtual-service-reviews-test-v2.yaml</summary>
+```
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: reviews
+spec:
+  hosts:
+    - reviews
+  http:
+  - match:
+    - headers:
+        end-user:
+          exact: jason
+    route:
+    - destination:
+        host: reviews
+        subset: v2
+  - route:
+    - destination:
+        host: reviews
+        subset: v1
+```
+</details>
+
+ref: https://github.com/istio/istio/tree/master/samples/bookinfo/networking
+
+
+## Traffic Shifting
+> [!Note]
+> reviews 버전에 따라 트래픽 지정
+> CI/CD pipeline 구성 시 canary 배포 적용 방안 고민
+```bash
+# v1와 v3에 각각 트래픽 50% 씩 분배
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-50-v3.yaml -n bookinfo
+
+# v2와 v3에 각각 트래픽 50% 씩 분배
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-v2-v3.yaml -n bookinfo
+
+# v3 에 트래픽 100%
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-v3.yaml -n bookinfo
 ```
 
+<details>
+  <summary>virtual-service-reviews-50-v3.yaml</summary>
+```
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: reviews
+spec:
+  hosts:
+    - reviews
+  http:
+  - route:
+    - destination:
+        host: reviews
+        subset: v1
+      weight: 50
+    - destination:
+        host: reviews
+        subset: v3
+      weight: 50
+```
+</details>
+
+
+<details>
+  <summary>virtual-service-reviews-v3.yaml</summary>
+```
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: reviews
+spec:
+  hosts:
+    - reviews
+  http:
+  - route:
+    - destination:
+        host: reviews
+        subset: v3
+```
+</details>
+
+## Fault Injection
+특정 서비스에 예상치 못한 문제가 발생될 경우를 대비해 Fault 주입을 통해 서비스(어플리케이션)가 어떻게 대응하는지 확인 하기 위함.
+코드변경이 아닌 Fault Injection 정의로 Resilience test 가능
+> [!Note]
+> productpage
+```bash
+# 모든 요청을 v1 으로만 흐르게 설정
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-all-v1.yaml -n bookinfo
+
+# jason 사용자만 reviews:v2 로 설정
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+```
+
+TODO: 코드
+
+### HTTP delay fault 주입
+```bash
+# jason 에게만 7초 딜레이가 발생되게 설정
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml -n bookinfo
+```
+Hint!
+https://github.com/istio/istio/blob/ea97d32cf46200d20378647d521001530f005bc8/samples/bookinfo/src/productpage/productpage.py#L400
+
+> [!Note]
+> Action Item: 7초 딜레이가 아닌 2초 딜레이를 주면 어떻게 되는지 확인 해보자.
+
+### HTTP fault 주입
 
 
 ---
