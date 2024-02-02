@@ -36,6 +36,9 @@ aks and istio
   ```cmd
   ssh-keygen -t rsa -b 4096 -f %userprofile%\.ssh\linux_rsa
   scp %userprofile%\.ssh\linux_rsa.pub -i <pem_file_path> dotnetpower@<remote_ip>:~/
+
+  [powershell]
+  ssh-keygen -m PEM -t rsa -b 2048
   ```
   ubuntu 에서
   ```bash
@@ -984,6 +987,9 @@ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samp
 TODO: 코드
 
 ### HTTP delay fault 주입
+> [!Note]
+> Action Item: 7초 딜레이가 아닌 2초 딜레이를 주면 어떻게 되는지 확인 해보자.
+$${\color{white}kubectl apply -n bookinfo -f - <<EOF ...}$$
 ```bash
 # jason 에게만 7초 딜레이가 발생되게 설정
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml -n bookinfo
@@ -991,10 +997,94 @@ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samp
 Hint!
 https://github.com/istio/istio/blob/ea97d32cf46200d20378647d521001530f005bc8/samples/bookinfo/src/productpage/productpage.py#L400
 
-> [!Note]
-> Action Item: 7초 딜레이가 아닌 2초 딜레이를 주면 어떻게 되는지 확인 해보자.
 
-### HTTP fault 주입
+
+### HTTP abort fault 주입
+ratings 이 오류가 발생되었다는 상황을 만들어 복원력 확인 가능
+> [!Note]
+> http://$GATEWAY_URL_EXTERNAL/productpage 에 접속하여 새로고침 할때 v1으로 고정되는지 확인
+> jason 사용자에게 적용되는 규칙이 정상적으로 적용되는지 확인
+> 세번째 규칙이 jason 에게만 발생되고 로그인되지 않은 사용자에게는 정상적으로 v1 으로 연결 되는지 확인
+
+```bash
+# 모든 요청을 v1 으로 
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-all-v1.yaml -n bookinfo
+
+# jason 사용자만 v2로, 나머진 v1으로
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+
+# v1에 500 에러 발생시키고 jason 사용자만 v1 으로
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-ratings-test-abort.yaml -n bookinfo
+```
+다음 코드로 서비스 요청을 하는 동안 kiali 에서 실패요청이 트래킹 되는지 확인
+```bash
+for i in $(seq 1 100); do curl -o /dev/null -s -w "Request: ${i}, Response: %{http_code}\n" "http://$GATEWAY_URL_EXTERNAL/productpage"; done
+```
+
+
+
+### Circuit Breaking
+https://istio.io/latest/docs/tasks/traffic-management/circuit-breaking/
+
+httpbin 구성
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/httpbin/httpbin.yaml -n bookinfo
+```
+
+```bash
+kubectl apply -n bookinfo -f - <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: httpbin
+spec:
+  host: httpbin
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 1
+      http:
+        http1MaxPendingRequests: 1
+        maxRequestsPerConnection: 1
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 1s
+      baseEjectionTime: 3m
+      maxEjectionPercent: 100
+EOF
+```
+
+확인
+```bash
+kubectl get destinationrule httpbin -n bookinfo -o yaml
+```
+
+fortio(부하테스트 도구) 구성
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/httpbin/sample-client/fortio-deploy.yaml -n bookinfo
+
+export FORTIO_POD=$(kubectl get pods -l app=fortio -n bookinfo -o jsonpath='{.items[0].metadata.name}')
+kubectl exec "$FORTIO_POD" -c fortio -n bookinfo -- /usr/bin/fortio curl -quiet http://httpbin:8000/get
+```
+
+2개의 커넥션으로 20번의 요청
+```bash
+kubectl exec "$FORTIO_POD" -c fortio -n bookinfo -- /usr/bin/fortio load -c 2 -qps 0 -n 20 -loglevel Warning http://httpbin:8000/get
+```
+maxRequestsPerConnection 가 1로 설정이 되어 동시 요청 2개인 경우 1개는 circuit breaking 걸림.
+
+
+
+
+
+
+
+
+
+
+
 
 
 ---
