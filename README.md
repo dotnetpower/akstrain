@@ -1,9 +1,17 @@
 # akstrain
-aks and istio
+AKS 에 Istio service mesh 를 구성하고 실습을 포함합니다.
 
 ## 워크샵 주제
-* Multi-container pods
-    * 1st section..
+* 쿠버네티스
+  * 배경
+  * 문제
+  * 문제 완화 방안
+* 서비스 메쉬
+  * Istio 아키텍처 및 컴포넌트
+* Hands-on Labs
+  * Traffic Management
+  * Observility
+
 
 ## Hands-on Lab 
 ### 사전 필요 환경
@@ -743,7 +751,11 @@ kubectl port-forward svc/kiali 20001:20001 -n aks-istio-system &
 
 트래픽을 발생시켜 Kiali UI 에서 확인
 ```bash
+# 100번 요청
 for i in $(seq 1 100); do curl -o /dev/null -s -w "Request: ${i}, Response: %{http_code}\n" "http://$GATEWAY_URL_EXTERNAL/productpage"; done
+
+# 무한 요청
+let i=0; while :; do let i++; curl -o /dev/null -s -w "Request: ${i}, Response: %{http_code}\n" "http://$GATEWAY_URL_EXTERNAL/productpage"; done
 ```
 Kiali 의 Graph 메뉴
 ![Alt text](./images/image-kiali-graph.png)
@@ -989,7 +1001,7 @@ TODO: 코드
 ### HTTP delay fault 주입
 > [!Note]
 > Action Item: 7초 딜레이가 아닌 2초 딜레이를 주면 어떻게 되는지 확인 해보자.
-$${\color{white}kubectl apply -n bookinfo -f - <<EOF ...}$$
+<!-- $${\color{white}kubectl apply -n bookinfo -f - <<EOF ...}$$ -->
 ```bash
 # jason 에게만 7초 딜레이가 발생되게 설정
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml -n bookinfo
@@ -1019,6 +1031,12 @@ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samp
 다음 코드로 서비스 요청을 하는 동안 kiali 에서 실패요청이 트래킹 되는지 확인
 ```bash
 for i in $(seq 1 100); do curl -o /dev/null -s -w "Request: ${i}, Response: %{http_code}\n" "http://$GATEWAY_URL_EXTERNAL/productpage"; done
+
+# 무한 요청
+let i=0; while :; do let i++; curl -o /dev/null -s -w "Request: ${i}, Response: %{http_code}\n" "http://$GATEWAY_URL_EXTERNAL/productpage"; done
+
+# 또는 
+watch -n 1 curl -o /dev/null -s -w %{http_code} $GATEWAY_URL_EXTERNAL/productpage
 ```
 
 
@@ -1063,10 +1081,10 @@ kubectl get destinationrule httpbin -n bookinfo -o yaml
 fortio(부하테스트 도구) 구성
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/httpbin/sample-client/fortio-deploy.yaml -n bookinfo
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/httpbin/sample-client/fortio-deploy.yaml -n bookinfo
 
 export FORTIO_POD=$(kubectl get pods -l app=fortio -n bookinfo -o jsonpath='{.items[0].metadata.name}')
-kubectl exec "$FORTIO_POD" -c fortio -n bookinfo -- /usr/bin/fortio curl -quiet http://httpbin:8000/get
+kubectl exec $FORTIO_POD -c fortio -n bookinfo -- /usr/bin/fortio curl -quiet http://httpbin:8000/get
 ```
 
 2개의 커넥션으로 20번의 요청
@@ -1081,7 +1099,37 @@ maxRequestsPerConnection 가 1로 설정이 되어 동시 요청 2개인 경우 
 
 
 
+## 상세 정보
+mesh 의 proxy 정보
+```bash
+istioctl -i aks-istio-system proxy-status
+```
+```bash
+NAME                                                                              CLUSTER        CDS        LDS        EDS        RDS        ECDS         ISTIOD                               VERSION
+aks-istio-ingressgateway-external-asm-1-18-7466f77bb9-2bx8x.aks-istio-ingress     Kubernetes     SYNCED     SYNCED     SYNCED     SYNCED     NOT SENT     istiod-asm-1-18-746d8f469c-mttxb     1.18.7-distroless
+aks-istio-ingressgateway-external-asm-1-18-7466f77bb9-zwjnz.aks-istio-ingress     Kubernetes     SYNCED     SYNCED     SYNCED     SYNCED     NOT SENT     istiod-asm-1-18-746d8f469c-bvl92     1.18.7-distroless
+details-v1-7c7dbcb4b5-prwmr.bookinfo                                              Kubernetes     SYNCED     SYNCED     SYNCED     SYNCED     NOT SENT     istiod-asm-1-18-746d8f469c-bvl92     1.18.7-distroless
+productpage-v1-664d44d68d-hx9dw.bookinfo                                          Kubernetes     SYNCED     SYNCED     SYNCED     SYNCED     NOT SENT     istiod-asm-1-18-746d8f469c-bvl92     1.18.7-distroless
+ratings-v1-844796bf85-dzjnc.bookinfo                                              Kubernetes     SYNCED     SYNCED     SYNCED     SYNCED     NOT SENT     istiod-asm-1-18-746d8f469c-mttxb     1.18.7-distroless
+reviews-v1-5cf854487-6dqfz.bookinfo                                               Kubernetes     SYNCED     SYNCED     SYNCED     SYNCED     NOT SENT     istiod-asm-1-18-746d8f469c-mttxb     1.18.7-distroless
+reviews-v2-955b74755-492qp.bookinfo                                               Kubernetes     SYNCED     SYNCED     SYNCED     SYNCED     NOT SENT     istiod-asm-1-18-746d8f469c-bvl92     1.18.7-distroless
+reviews-v3-797fc48bc9-rqvk8.bookinfo                                              Kubernetes     SYNCED     SYNCED     SYNCED     SYNCED     NOT SENT     istiod-asm-1-18-746d8f469c-bvl92     1.18.7-distroless
+```
 
+productpage 의 사이드카 인젝션 정보
+```bash
+PRODUCTPAGE_POD=$(kubectl get pods -n bookinfo | grep ^productpage | awk '{print $1}')
+istioctl -i aks-istio-system experimental check-inject $PRODUCTPAGE_POD -n bookinfo
+```
+Mesh 구성정보 상세
+```bash
+istioctl -i aks-istio-system experimental describe pod $PRODUCTPAGE_POD -n bookinfo
+```
+
+productpage의 envoy 에 대해서
+```bash
+istioctl -i aks-istio-system proxy-config endpoint $PRODUCTPAGE_POD -n bookinfo
+```
 
 
 
@@ -1098,6 +1146,9 @@ vscode remote ports
 # bash 커맨드 창에 시간 찍기
 sudo timedatectl set-timezone Asia/Seoul
 export PROMPT_COMMAND="echo -n \[\$(date +%H:%M:%S)\]\ "
+
+# 현재 클러스터를 커맨트 창 앞에 붙이기
+export PROMPT_COMMAND="echo -n [$CLUSTER]"
 ```
 
 
