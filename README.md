@@ -72,7 +72,7 @@ AKS 에 Istio service mesh 를 구성하고 실습을 포함합니다.
 istio-env.sh
 ```
 # 환경변수
-seq=7
+seq=1
 export CLUSTER=istio-addon-lab-${seq}
 export RESOURCE_GROUP=istio-addon-lab-rg-${seq}
 export LOCATION=eastus #koreacentral
@@ -133,16 +133,26 @@ kubectl get pods -n aks-istio-system
 
 ```
 
+Envoy proxy 사용 전 리소스 현황
+```bash
+kubectl top node --use-protocol-buffers
+```
+
 sidecar 주입 활성화(bookinfo)
 ```bash
 kubectl create ns bookinfo
 kubectl label namespace bookinfo istio.io/rev=asm-1-18
 
-
 ```
 
-istioctl 설치
-**istio 버전이 바뀔 수 있으므로 확인 필요**
+Envoy proxy 사용 설정 후 리소스(20~30% 정도 사용률 증가)
+```bash
+kubectl top node --use-protocol-buffers
+```
+
+
+**istioctl 설치**
+istio 버전이 바뀔 수 있으므로 확인 필요
 ```bash
 # 버전 확인
 ISTIO_VERSION="$(kubectl get deploy istiod-asm-1-18 -n aks-istio-system -o yaml | grep image: | egrep -o '[0-9]+\.[0-9]+\.[0-9]+')"
@@ -176,8 +186,11 @@ kubectl get svc aks-istio-ingressgateway-external -n aks-istio-ingress
 # istiod 버전 확인
 kubectl get deploy -n aks-istio-system
 
+
+ISTIOD_NAME=$(kubectl get deploy -n aks-istio-system | awk 'NR>1 {print $1}')
+
 # istiod dash 설치/실행(버전이 1.18인 경우)
-istioctl dashboard controlz deployment/istiod-asm-1-18 -n aks-istio-system
+istioctl dashboard controlz deployment/$ISTIOD_NAME -n aks-istio-system
 
 ```
 
@@ -839,6 +852,8 @@ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samp
 # jason 만 reviews:v2 로 보내기
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
 ```
+
+
 <details>
   <summary>virtual-service-all-v1.yaml</summary>
   ```
@@ -924,7 +939,11 @@ spec:
 </details>
 
 ref: https://github.com/istio/istio/tree/master/samples/bookinfo/networking
-
+## Request Routing - 리소스 정리
+```bash
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-all-v1.yaml -n bookinfo
+```
 
 ## Traffic Shifting
 > [!Note]
@@ -940,6 +959,7 @@ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samp
 # v3 에 트래픽 100%
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-v3.yaml -n bookinfo
 ```
+
 
 <details>
   <summary>virtual-service-reviews-50-v3.yaml</summary>
@@ -983,6 +1003,13 @@ spec:
 ```
 </details>
 
+## Traffic Shifting - 리소스 정리
+```bash
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-v3.yaml -n bookinfo
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-v2-v3.yaml -n bookinfo
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-50-v3.yaml -n bookinfo
+```
+
 ## Fault Injection
 특정 서비스에 예상치 못한 문제가 발생될 경우를 대비해 Fault 주입을 통해 서비스(어플리케이션)가 어떻게 대응하는지 확인 하기 위함.
 코드변경이 아닌 Fault Injection 정의로 Resilience test 가능
@@ -994,6 +1021,11 @@ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samp
 
 # jason 사용자만 reviews:v2 로 설정
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+```
+## Fault Injection - 리소스 정리
+```bash
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-all-v1.yaml -n bookinfo
 ```
 
 TODO: 코드
@@ -1009,6 +1041,11 @@ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samp
 Hint!
 https://github.com/istio/istio/blob/ea97d32cf46200d20378647d521001530f005bc8/samples/bookinfo/src/productpage/productpage.py#L400
 
+### HTTP delay fault 주입 - 리소스 정리
+```bash
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml -n bookinfo
+
+```
 
 
 ### HTTP abort fault 주입
@@ -1038,7 +1075,13 @@ let i=0; while :; do let i++; curl -o /dev/null -s -w "Request: ${i}, Response: 
 # 또는 
 watch -n 1 curl -o /dev/null -s -w %{http_code} $GATEWAY_URL_EXTERNAL/productpage
 ```
+### HTTP abort fault 주입 - 리소스 정리
+```bash
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-ratings-test-abort.yaml -n bookinfo
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-reviews-test-v2.yaml -n bookinfo
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/virtual-service-all-v1.yaml -n bookinfo
 
+```
 
 
 ### Circuit Breaking
@@ -1089,12 +1132,211 @@ kubectl exec $FORTIO_POD -c fortio -n bookinfo -- /usr/bin/fortio curl -quiet ht
 
 2개의 커넥션으로 20번의 요청
 ```bash
-kubectl exec "$FORTIO_POD" -c fortio -n bookinfo -- /usr/bin/fortio load -c 2 -qps 0 -n 20 -loglevel Warning http://httpbin:8000/get
+kubectl exec $FORTIO_POD -c fortio -n bookinfo -- /usr/bin/fortio load -c 2 -qps 0 -n 20 -loglevel Warning http://httpbin:8000/get
 ```
 maxRequestsPerConnection 가 1로 설정이 되어 동시 요청 2개인 경우 1개는 circuit breaking 걸림.
 
 
+### Circuit Breaking - 리소스 정리
+규칙 삭제
+```bash
+kubectl delete destinationrule httpbin -n bookinfo
 
+```
+
+httpbin 서비스와 클라이언트 제거
+```bash
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/httpbin/sample-client/fortio-deploy.yaml -n bookinfo
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/httpbin/httpbin.yaml -n bookinfo
+```
+
+## Security - Authorization - HTTP Traffic
+HTTP 트래픽에 대해 ALLOW 액션 정책 설정으로 접속 허용/거부 적용
+https://istio.io/latest/docs/tasks/security/authorization/authz-http/
+```bash
+# 모든 요청 차단
+kubectl apply -f - <<EOF
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-nothing
+  namespace: bookinfo
+spec:
+  {}
+EOF
+```
+http://$GATEWAY_URL_EXTERNAL/productpage 페이지 새로고침하면 RBAC: access denied 발생
+
+```bash
+# productpage만 허용, details, reviews, rating 은 여전히 차단
+kubectl apply -f - <<EOF
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: "productpage-viewer"
+  namespace: bookinfo
+spec:
+  selector:
+    matchLabels:
+      app: productpage
+  action: ALLOW
+  rules:
+  - to:
+    - operation:
+        methods: ["GET"]
+EOF
+```
+![Alt text](./images/image-authorization-productpage.png)
+
+```bash
+# details 도 허용
+kubectl apply -f - <<EOF
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: "details-viewer"
+  namespace: bookinfo
+spec:
+  selector:
+    matchLabels:
+      app: details
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/bookinfo/sa/bookinfo-productpage"]
+    to:
+    - operation:
+        methods: ["GET"]
+EOF
+
+# reviews 도 허용
+kubectl apply -f - <<EOF
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: "reviews-viewer"
+  namespace: bookinfo
+spec:
+  selector:
+    matchLabels:
+      app: reviews
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/bookinfo/sa/bookinfo-productpage"]
+    to:
+    - operation:
+        methods: ["GET"]
+EOF
+
+
+# ratings 도 허용
+kubectl apply -f - <<EOF
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: "ratings-viewer"
+  namespace: bookinfo
+spec:
+  selector:
+    matchLabels:
+      app: ratings
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/bookinfo/sa/bookinfo-reviews"]
+    to:
+    - operation:
+        methods: ["GET"]
+EOF
+```
+![Alt text](./images/image-authorization-end.png)
+
+
+## IBM Robot-shop
+
+오류 발생구간을 Kiali 로 확인
+> [!Note]
+> 왜 오류가 발생하는지 원인 찾기
+
+```bash
+# 다른 폴더로 이동 후
+git clone https://github.com/instana/robot-shop
+kubectl create ns robot-shop
+
+# 사이드카 인젝션
+kubectl label namespace robot-shop istio.io/rev=asm-1-18
+
+# helm 으로 robot-shop 설치
+helm install robot-shop --namespace robot-shop .
+
+# 배포상태 확인
+kubectl get pod,svc -n robot-shop
+
+
+
+WEB_SVC_EXTERNAL_IP=$(kubectl get svc -n robot-shop | grep ^web | awk '{print $4}')
+WEB_SVC_EXTERNAL_PORT=$(kubectl get svc -n robot-shop | grep ^web | awk '{print $5}' | cut -d ':' -f 1)
+ROBOT_SHOP_URL="http://${WEB_SVC_EXTERNAL_IP}:${WEB_SVC_EXTERNAL_PORT}"
+echo $ROBOT_SHOP_URL
+
+
+```
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: robotshop-gateway
+  namespace: robot-shop
+spec:
+  selector:
+    istio: aks-istio-ingressgateway-external
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: robotshop
+  namespace: robot-shop
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - robotshop-gateway
+  http:
+  # default route
+  - route:
+    - destination:
+        host: web.robot-shop.svc.cluster.local
+        port:
+          number: 8080
+EOF
+
+```
+
+
+
+
+
+
+# 리소스 정리 - 전체
+```bash
+az aks mesh disable --resource-group ${RESOURCE_GROUP} --name ${CLUSTER}
+kubectl delete crd $(kubectl get crd -A | grep "istio.io" | awk '{print $1}')
+
+az group delete --name ${RESOURCE_GROUP} --yes --no-wait
+```
 
 
 
