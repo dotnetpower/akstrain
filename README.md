@@ -73,9 +73,14 @@ istio-env.sh
 ```
 # 환경변수
 seq=1
-export CLUSTER=istio-addon-lab-${seq}
-export RESOURCE_GROUP=istio-addon-lab-rg-${seq}
-export LOCATION=eastus #koreacentral
+# export CLUSTER=istio-addon-lab-${seq}
+# export RESOURCE_GROUP=istio-addon-lab-rg-${seq}
+# export LOCATION=eastus #koreacentral
+# export K8S_VERSION=1.27.7
+
+export CLUSTER=istio-addon-lab
+export RESOURCE_GROUP=gmarket-istio-lab
+export LOCATION=koreacentral
 export K8S_VERSION=1.27.7
 
 ```
